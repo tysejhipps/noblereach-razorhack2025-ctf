@@ -453,7 +453,7 @@
         </div>
       `;
 
-      // Add event listener for flag input if it exists
+     // Add event listener for flag input if it exists
       const flagInput = document.getElementById('flag-input');
       if (flagInput) {
         flagInput.addEventListener('input', (e) => {
@@ -467,13 +467,31 @@
       }
     }
 
-    // Restart button (true reset)
+    /** * NEW: Level Select Function 
+     * Allows you to jump between steps without deleting data
+     **/
+    window.jumpToChallenge = function(index) {
+      state.currentChallenge = index;
+      state.error = '';
+      state.success = '';
+      state.flagInput = '';
+      saveState();
+      render();
+    };
+
+    /** * UPDATED: Restart Logic 
+     * This only wipes your browser's progress. 
+     * It does NOT delete the data already sent to NocoDB.
+     **/
     document.getElementById('restartBtn').addEventListener('click', () => {
-      localStorage.removeItem('noblereach_progress');
-      window.location.reload();
+      const confirmRestart = confirm("This will reset your local progress to Step 1. Your previous NocoDB submission will remain in the database. Proceed?");
+      if (confirmRestart) {
+        localStorage.removeItem('noblereach_progress');
+        window.location.reload();
+      }
     });
 
-    // Initialize
+    // Initialize the application
     loadState();
     render();
   </script>
