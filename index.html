@@ -21,19 +21,11 @@
     <div id="app"></div>
 
     <script>
-        // CONFIGURATION - Verified from your NocoDB URL
         const NOCODB_CONFIG = {
             baseUrl: 'https://app.nocodb.com',
             token: 'eozQbu5W1PBaRSAhD2NaXy_C2SuDte3xDk7egGsv',
             baseId: 'po84x0qrgw03tpo',
             tableId: 'mf7s4qbz1tmf4ne'
-        };
-
-        const icons = {
-            lock: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
-            unlock: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
-            check: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-            refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>'
         };
 
         let state = {
@@ -42,9 +34,8 @@
             hasStarted: false,
             currentChallenge: 0,
             completedChallenges: [],
-            flagInput: '',
             error: '',
-            status: 'idle' // 'idle', 'submitting', 'success'
+            status: 'idle'
         };
 
         const challenges = [
@@ -66,77 +57,59 @@
         }
 
         function handleRestart() {
-            if (confirm("This will reset all progress. Continue?")) {
+            if (confirm("Reset all progress?")) {
                 localStorage.removeItem('noblereach_session');
                 window.location.reload();
             }
         }
 
-        async function submitToNocoDB(name, email) {
-            const apiUrl = `${NOCODB_CONFIG.baseUrl}/api/v2/tables/${NOCODB_CONFIG.tableId}/records`;
-            
-            const payload = {
-                "Name": name,
-                "Email": email
-            };
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'xc-token': NOCODB_CONFIG.token
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.message || "Failed to connect to NocoDB");
-            }
-            return response.json();
-        }
-
         async function handleSignup() {
-            if (!state.name || !state.email) {
-                state.error = "Both Name and Email are required.";
+            const nameVal = document.getElementById('name-in').value;
+            const emailVal = document.getElementById('email-in').value;
+            
+            if (!nameVal || !emailVal) {
+                state.error = "Name and Email required.";
                 render();
                 return;
             }
 
             state.status = 'submitting';
-            state.error = '';
             render();
 
             try {
-                await submitToNocoDB(state.name, state.email);
+                await fetch(`${NOCODB_CONFIG.baseUrl}/api/v2/tables/${NOCODB_CONFIG.tableId}/records`, {
+                    method: 'POST',
+                    headers: { 'accept': 'application/json', 'Content-Type': 'application/json', 'xc-token': NOCODB_CONFIG.token },
+                    body: JSON.stringify({ "Name": nameVal, "Email": emailVal })
+                });
+                state.name = nameVal;
+                state.email = emailVal;
                 state.hasStarted = true;
                 state.status = 'idle';
                 saveState();
                 render();
             } catch (err) {
                 state.status = 'idle';
-                state.error = "Error: " + err.message;
+                state.error = "Database Error. Please try again.";
                 render();
             }
         }
 
         function handleFlagSubmit() {
+            const inputEl = document.getElementById('flag-in');
+            const input = inputEl.value.toLowerCase().trim();
             const current = challenges[state.currentChallenge];
-            const input = state.flagInput.toLowerCase().trim();
             
             if (current.flags.includes(input)) {
                 state.completedChallenges.push(current.id);
-                state.flagInput = '';
                 state.error = '';
-                
                 if (state.currentChallenge < challenges.length - 1) {
                     state.currentChallenge++;
                 }
                 saveState();
                 render();
             } else {
-                state.error = "Incorrect flag. Keep searching.";
+                state.error = "Incorrect flag.";
                 render();
             }
         }
@@ -147,93 +120,26 @@
             if (!state.hasStarted) {
                 app.innerHTML = `
                 <div class="flex items-center justify-center min-h-screen p-4">
-                    <div class="glass-panel p-8 rounded-2xl w-full max-w-md shadow-2xl border-t-4 border-t-green-500">
-                        <div class="text-center mb-8">
-                            <h1 class="text-3xl font-black tracking-tighter text-white uppercase italic">NobleReach</h1>
-                            <p class="text-slate-400 text-sm mt-2">OSINT CHALLENGE ENTRY</p>
-                        </div>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="text-xs font-bold text-slate-500 uppercase ml-1">Name</label>
-                                <input type="text" id="name-in" value="${state.name}" placeholder="Agent Name" 
-                                    class="w-full p-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:border-green-500 outline-none transition-all">
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-slate-500 uppercase ml-1">Email</label>
-                                <input type="email" id="email-in" value="${state.email}" placeholder="Secure Email" 
-                                    class="w-full p-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:border-green-500 outline-none transition-all">
-                            </div>
-                            ${state.error ? `<p class="text-red-400 text-xs bg-red-900/20 p-2 rounded border border-red-900/50">${state.error}</p>` : ''}
-                            <button onclick="handleSignup()" ${state.status === 'submitting' ? 'disabled' : ''} 
-                                class="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 py-4 rounded-lg font-black uppercase tracking-widest transition-all shadow-lg shadow-green-900/20">
-                                ${state.status === 'submitting' ? 'Accessing Files...' : 'Initialize Mission'}
+                    <div class="glass-panel p-8 rounded-2xl w-full max-w-md shadow-2xl border-t-4 border-t-green-500 text-center">
+                        <h1 class="text-3xl font-black mb-6 italic uppercase tracking-widest">NobleReach</h1>
+                        <div class="space-y-4 text-left">
+                            <input type="text" id="name-in" placeholder="Full Name" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-green-500">
+                            <input type="email" id="email-in" placeholder="Email Address" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-green-500">
+                            ${state.error ? `<p class="text-red-400 text-xs">${state.error}</p>` : ''}
+                            <button onclick="handleSignup()" class="w-full bg-green-600 py-3 rounded-lg font-bold uppercase tracking-widest">
+                                ${state.status === 'submitting' ? 'Verifying...' : 'Start Mission'}
                             </button>
                         </div>
                     </div>
                 </div>`;
-
-                document.getElementById('name-in').oninput = (e) => state.name = e.target.value;
-                document.getElementById('email-in').oninput = (e) => state.email = e.target.value;
                 return;
             }
 
             app.innerHTML = `
             <div class="max-w-3xl mx-auto px-6 py-12">
-                <header class="flex justify-between items-end mb-12 border-b border-slate-800 pb-6">
-                    <div>
-                        <p class="text-green-500 font-mono text-xs mb-1">LOGGED_IN_AS:</p>
-                        <h2 class="text-2xl font-bold">${state.name}</h2>
-                    </div>
-                    <button onclick="handleRestart()" class="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors tracking-widest uppercase">
-                        ${icons.refresh} Abort Mission
-                    </button>
-                </header>
-
-                <div class="space-y-4">
-                    ${challenges.map((c, idx) => {
-                        const isUnlocked = idx <= state.completedChallenges.length;
-                        const isDone = state.completedChallenges.includes(c.id);
-                        const isActive = idx === state.currentChallenge && !isDone && isUnlocked;
-
-                        if (!isUnlocked) return '';
-
-                        return `
-                        <div class="glass-panel rounded-xl overflow-hidden transition-all ${isActive ? 'ring-2 ring-green-500' : ''}">
-                            <div class="p-6">
-                                <div class="flex items-center gap-4 mb-3">
-                                    <div class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 border border-slate-700">
-                                        ${isDone ? icons.check : (isActive ? icons.unlock : icons.lock)}
-                                    </div>
-                                    <h3 class="font-bold text-lg ${isDone ? 'text-slate-500 line-through' : 'text-white'}">${c.title}</h3>
-                                </div>
-                                
-                                ${isActive ? `
-                                    <p class="text-slate-300 mb-6 leading-relaxed">${c.description}</p>
-                                    <div class="flex gap-2">
-                                        <input type="text" id="flag-in" placeholder="Enter Flag{...}" 
-                                            class="flex-1 p-3 bg-slate-950 border border-slate-700 rounded-lg text-white outline-none focus:border-green-500">
-                                        <button onclick="handleFlagSubmit()" class="bg-white text-black px-6 rounded-lg font-bold hover:bg-green-400 transition-colors">SUBMIT</button>
-                                    </div>
-                                    ${state.error ? `<p class="text-red-400 text-xs mt-3 font-mono">${state.error}</p>` : ''}
-                                ` : ''}
-
-                                ${isDone ? `<p class="text-green-500 text-xs font-mono uppercase tracking-widest">Clearance Level Granted</p>` : ''}
-                            </div>
-                        </div>`;
-                    }).join('')}
+                <div class="flex justify-between items-center mb-10 border-b border-slate-800 pb-6">
+                    <h2 class="text-xl font-bold text-green-400">${state.name}</h2>
+                    <button onclick="handleRestart()" class="text-xs text-slate-500 hover:text-red-400 uppercase font-bold">Abort</button>
                 </div>
-            </div>`;
 
-            const fi = document.getElementById('flag-in');
-            if (fi) {
-                fi.oninput = (e) => state.flagInput = e.target.value;
-                fi.onkeypress = (e) => e.key === 'Enter' && handleFlagSubmit();
-                fi.focus();
-            }
-        }
-
-        loadState();
-        render();
-    </script>
-</body>
-</html>
+                <div class="space-y-6
