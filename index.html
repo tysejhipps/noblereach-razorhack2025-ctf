@@ -9,10 +9,11 @@
         body {
             background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
             min-height: 100vh;
+            margin: 0;
         }
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
+        .glass {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
@@ -21,125 +22,102 @@
     <div id="app"></div>
 
     <script>
-        const NOCODB_CONFIG = {
-            baseUrl: 'https://app.nocodb.com',
-            token: 'eozQbu5W1PBaRSAhD2NaXy_C2SuDte3xDk7egGsv',
-            baseId: 'po84x0qrgw03tpo',
-            tableId: 'mf7s4qbz1tmf4ne'
+        // Use the exact IDs from your NocoDB URL
+        const CONFIG = {
+            url: 'https://app.nocodb.com/api/v2/tables/mf7s4qbz1tmf4ne/records',
+            token: 'eozQbu5W1PBaRSAhD2NaXy_C2SuDte3xDk7egGsv'
         };
 
         let state = {
-            email: '',
-            name: '',
             hasStarted: false,
-            currentChallenge: 0,
-            completedChallenges: [],
-            error: '',
-            status: 'idle'
+            name: '',
+            email: '',
+            currentStep: 0,
+            completed: [],
+            error: ''
         };
 
         const challenges = [
-            { id: 1, title: "Step 1 — The First Recruit", description: "Which organization gave rise to the Scholar?", flags: ["flag{noblereach}", "flag{noblereach_foundation}"] },
-            { id: 2, title: "Step 2 — The Insider Scholar", description: "Discover which Scholar still walks among you.", flags: ["flag{tyse_hipps}", "flag{tyse}"] },
-            { id: 3, title: "Step 3 — The Scholar's Footprint", description: "Decode the message hidden in the digital trace.", flags: ["flag{digital_trace}"] },
-            { id: 4, title: "Step 4 — The Noble Cipher", description: "Decode the concealed instructions.", flags: ["flag{noble_cipher}"] },
-            { id: 5, title: "Step 5 — The Scholar's Network", description: "Enter the secret phrase to proceed.", flags: ["flag{to_make_an_impact_for_the_public_good}"] },
-            { id: 6, title: "Step 6 — The Hidden Truth", description: "Find the highlighted text in the document.", flags: ["flag{make_a_real_difference_for_the_future_of_our_country}"] }
+            { id: 1, title: "Step 1", desc: "Which organization gave rise to the Scholar?", flags: ["flag{noblereach}"] },
+            { id: 2, title: "Step 2", desc: "Discover which Scholar still walks among you.", flags: ["flag{tyse_hipps}"] },
+            { id: 3, title: "Step 3", desc: "Decode the message in the digital trace.", flags: ["flag{digital_trace}"] }
         ];
 
-        function saveState() {
-            localStorage.setItem('noblereach_session', JSON.stringify(state));
-        }
-
-        function loadState() {
-            const saved = localStorage.getItem('noblereach_session');
-            if (saved) state = { ...state, ...JSON.parse(saved) };
-        }
-
-        function handleRestart() {
-            if (confirm("Reset all progress?")) {
-                localStorage.removeItem('noblereach_session');
-                window.location.reload();
-            }
-        }
-
-        async function handleSignup() {
-            const nameVal = document.getElementById('name-in').value;
-            const emailVal = document.getElementById('email-in').value;
-            
-            if (!nameVal || !emailVal) {
-                state.error = "Name and Email required.";
-                render();
-                return;
-            }
-
-            state.status = 'submitting';
+        function init() {
+            const saved = localStorage.getItem('nr_state');
+            if (saved) state = JSON.parse(saved);
             render();
+        }
+
+        async function startMission() {
+            const n = document.getElementById('u-name').value;
+            const e = document.getElementById('u-email').value;
+            if (!n || !e) { state.error = "Enter details"; render(); return; }
 
             try {
-                await fetch(`${NOCODB_CONFIG.baseUrl}/api/v2/tables/${NOCODB_CONFIG.tableId}/records`, {
+                const res = await fetch(CONFIG.url, {
                     method: 'POST',
-                    headers: { 'accept': 'application/json', 'Content-Type': 'application/json', 'xc-token': NOCODB_CONFIG.token },
-                    body: JSON.stringify({ "Name": nameVal, "Email": emailVal })
+                    headers: { 'Content-Type': 'application/json', 'xc-token': CONFIG.token },
+                    body: JSON.stringify({ "Name": n, "Email": e })
                 });
-                state.name = nameVal;
-                state.email = emailVal;
-                state.hasStarted = true;
-                state.status = 'idle';
-                saveState();
-                render();
+                if (!res.ok) throw new Error();
+                state.name = n; state.email = e; state.hasStarted = true; state.error = '';
+                save(); render();
             } catch (err) {
-                state.status = 'idle';
-                state.error = "Database Error. Please try again.";
+                state.error = "Connection failed. Check NocoDB.";
                 render();
             }
         }
 
-        function handleFlagSubmit() {
-            const inputEl = document.getElementById('flag-in');
-            const input = inputEl.value.toLowerCase().trim();
-            const current = challenges[state.currentChallenge];
-            
-            if (current.flags.includes(input)) {
-                state.completedChallenges.push(current.id);
+        function checkFlag() {
+            const input = document.getElementById('f-in').value.toLowerCase().trim();
+            if (challenges[state.currentStep].flags.includes(input)) {
+                state.completed.push(challenges[state.currentStep].id);
+                if (state.currentStep < challenges.length - 1) state.currentStep++;
                 state.error = '';
-                if (state.currentChallenge < challenges.length - 1) {
-                    state.currentChallenge++;
-                }
-                saveState();
-                render();
             } else {
-                state.error = "Incorrect flag.";
-                render();
+                state.error = "Wrong flag.";
             }
+            save(); render();
         }
+
+        function reset() { localStorage.clear(); window.location.reload(); }
+        function save() { localStorage.setItem('nr_state', JSON.stringify(state)); }
 
         function render() {
             const app = document.getElementById('app');
-
             if (!state.hasStarted) {
                 app.innerHTML = `
-                <div class="flex items-center justify-center min-h-screen p-4">
-                    <div class="glass-panel p-8 rounded-2xl w-full max-w-md shadow-2xl border-t-4 border-t-green-500 text-center">
-                        <h1 class="text-3xl font-black mb-6 italic uppercase tracking-widest">NobleReach</h1>
-                        <div class="space-y-4 text-left">
-                            <input type="text" id="name-in" placeholder="Full Name" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-green-500">
-                            <input type="email" id="email-in" placeholder="Email Address" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-green-500">
-                            ${state.error ? `<p class="text-red-400 text-xs">${state.error}</p>` : ''}
-                            <button onclick="handleSignup()" class="w-full bg-green-600 py-3 rounded-lg font-bold uppercase tracking-widest">
-                                ${state.status === 'submitting' ? 'Verifying...' : 'Start Mission'}
-                            </button>
-                        </div>
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="glass p-8 rounded-2xl w-80 text-center shadow-2xl">
+                        <h1 class="text-2xl font-black mb-6 italic">NOBLEREACH</h1>
+                        <input id="u-name" type="text" placeholder="Name" class="w-full mb-3 p-2 bg-black/40 rounded border border-white/20 outline-none">
+                        <input id="u-email" type="email" placeholder="Email" class="w-full mb-3 p-2 bg-black/40 rounded border border-white/20 outline-none">
+                        <p class="text-red-400 text-xs mb-3">${state.error}</p>
+                        <button onclick="startMission()" class="w-full bg-green-600 p-2 rounded font-bold">START</button>
                     </div>
                 </div>`;
-                return;
+            } else {
+                app.innerHTML = `
+                <div class="max-w-xl mx-auto p-10">
+                    <div class="flex justify-between mb-8 border-b border-white/10 pb-4">
+                        <span class="font-bold text-green-400">${state.name}</span>
+                        <button onclick="reset()" class="text-xs opacity-50">RESET</button>
+                    </div>
+                    <div class="glass p-6 rounded-xl">
+                        <h2 class="font-bold mb-2">${challenges[state.currentStep].title}</h2>
+                        <p class="text-sm opacity-70 mb-4">${challenges[state.currentStep].desc}</p>
+                        <div class="flex gap-2">
+                            <input id="f-in" type="text" placeholder="flag{...}" class="flex-1 p-2 bg-black/40 rounded border border-white/20 outline-none">
+                            <button onclick="checkFlag()" class="bg-white text-black px-4 rounded font-bold">GO</button>
+                        </div>
+                        <p class="text-red-400 text-xs mt-2">${state.error}</p>
+                    </div>
+                </div>`;
             }
+        }
 
-            app.innerHTML = `
-            <div class="max-w-3xl mx-auto px-6 py-12">
-                <div class="flex justify-between items-center mb-10 border-b border-slate-800 pb-6">
-                    <h2 class="text-xl font-bold text-green-400">${state.name}</h2>
-                    <button onclick="handleRestart()" class="text-xs text-slate-500 hover:text-red-400 uppercase font-bold">Abort</button>
-                </div>
-
-                <div class="space-y-6
+        init();
+    </script>
+</body>
+</html>
