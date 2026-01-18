@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NobleReach OSINT Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <div id="app"></div>
+
+    <script>
+        // NocoDB Configuration
+        const NOCODB_CONFIG = {
+            baseUrl: 'https://app.nocodb.com',
+            token: 'eozQbu5W1PBaRSAhD2NaXy_C2SuDte3xDk7egGsv',
+            baseId: 'pwve8c8kmvl9n86',
+            tableId: 'mrh25fbj4szjiqx'
+        };
+
+        // SVG Icons as strings
+        const icons = {
+            lock: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+            unlock: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
+            check: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+            mail: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+            user: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+            trophy: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+            alert: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>'
+        };
+
+        // State management
+        let state = {
+            email: '',
+            name: '',
+            hasStarted: false,
+            currentChallenge: 0,
+            completedChallenges: [],
+            flagInput: '',
+            error: '',
+            success: ''
+        };
+
+        // Challenges data
+        const challenges = [
+            {
+                id: 1,
+                title: "Step 1 — The First Recruit",
+                description: "Before the Jurassic Preserve opened its gates, its founders recruited visionaries from a program known for taking recent graduates in tech, science, and entrepreneurship — using their skills to make an impact for the public good.\n\nThe trail begins with one of the Preserve's greatest backers.\n\n**Which organization gave rise to the Scholar?**",
+                hint: "Check the RazorHack site for clues about the Preserve's backers. Look for clickable logos.",
+                flags: ["flag{noblereach}", "flag{noblereach_foundation}", "flag{noblereachfoundation}"],
+                points: 100
+            },
+            {
+                id: 2,
+                title: "Step 2 — The Insider Scholar",
+                description: "The Preserve's leadership didn't stop at recruiting new minds — one of those Scholars never left. Chosen for their vision, they remain embedded within the Preserve, guiding its systems from the shadows.\n\n**Your task is to discover which Scholar still walks among you.**",
+                hint: "Cross-reference NobleReach Scholars bios with Preserve staff and gamemaster information.",
+                flags: ["flag{tyse_hipps}", "flag{tyse}"],
+                points: 150
+            },
+            {
+                id: 3,
+                title: "Step 3 — The Scholar's Footprint",
+                description: "The Scholar who remained at the Preserve did not stay idle. He began work on something top secret — not for profit, but for the public good. His notes hinted at a breakthrough, though the project was never finished.\n\nBefore he disappeared into hiding, he left behind a trace, hidden in his public record, for those who would come after him to find and carry on his work.\n\n**Find the Scholar's digital footprint and decode the message he left behind.**",
+                hint: "The Scholar's public professional profile (LinkedIn) may hold clues. Look for encoded messages in Base64.",
+                artifact: "The Scholar's Note contains: ZmxhZ3tkaWdpdGFsX3RyYWNlX25yc30=",
+                flags: ["flag{digital_trace}", "flag{digital_trace_nrs}"],
+                points: 200
+            },
+            {
+                id: 4,
+                title: "Step 4 — The Noble Cipher",
+                description: "The Scholar knew his work carried both promise and danger. If discovered by the wrong hands, it could be twisted against the very people it was meant to help.\n\nTo guard his unfinished project, he concealed his instructions in cipher, trusting only those who shared his mission to unlock them.\n\n**PRESERVE ARCHIVE — NOBLE CIPHER**\n\nszbr{rfflg_jvdipv}\nkle ulpffe tyvaul vg: uz qroe cu vaqlgk jot aus qffcmc ivbr.\n\n**Decode the concealed instructions and figure out the hidden message.**",
+                hint: "The key to this cipher was discovered in the previous step. Try Vigenère cipher with key 'NOBLEREACH'.",
+                flags: ["flag{noble_cipher}"],
+                points: 250
+            },
+            {
+                id: 5,
+                title: "Step 5 — The Scholar's Network",
+                description: "The Scholar could not carry his mission alone. He entrusted fragments of his work to trusted agents who still walk among us.\n\n**Your Mission:**\nDM Tyse or a NobleReach employee to setup a 15-minute coffee chat to learn more about the Scholar's work. When you connect, share the secret phrase you discovered in Step 4.\n\n**Or, if you just want to complete the challenge:**\nEnter the secret phrase from Step 4 as your flag to proceed to the next challenge.\n\n*The choice is yours—connect with us or continue the trail.*",
+                hint: "The secret phrase from Step 4 was: 'to make an impact for the public good'. You can either reach out to schedule a chat, or enter this phrase to move forward.",
+                flags: ["flag{to_make_an_impact_for_the_public_good}", "flag{make_an_impact_for_the_public_good}", "flag{impact_for_public_good}", "flag{public_good}"],
+                points: 300
+            },
+            {
+                id: 6,
+                title: "Step 6 — The Hidden Truth",
+                description: "The Scholar's agents have shared a crucial document with you. Hidden within its pages is a highlighted phrase—words that reveal the true purpose behind everything the Scholar worked toward.\n\n**Your Mission:**\nExamine the image or document provided during your conversation. Find the highlighted text and submit it as your flag.\n\n*The answer lies in what the Scholar wanted to achieve.*",
+                hint: "Look for highlighted text Tyse shared on his LinkedIn. Look for a flyer image. The phrase speaks to making a difference.",
+                flags: ["flag{make_a_real_difference_for_the_future_of_our_country}", "flag{make_a_real_difference}", "flag{real_difference_for_the_future}", "flag{future_of_our_country}"],
+                points: 400
+            }
+        ];
+
+        // Load state from localStorage
+        function loadState() {
+            const saved = localStorage.getItem('noblereach_progress');
+            if (saved) {
+                state = { ...state, ...JSON.parse(saved) };
+            }
+        }
+
+        // Save state to localStorage
+        function saveState() {
+            localStorage.setItem('noblereach_progress', JSON.stringify(state));
+        }
+
+        // Submit lead to NocoDB
+        async function submitToNocoDB(name, email) {
+            const apiUrl = `${NOCODB_CONFIG.baseUrl}/api/v2/tables/${NOCODB_CONFIG.tableId}/records`;
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'xc-token': NOCODB_CONFIG.token
+                    },
+                    body: JSON.stringify({
+                        Name: name,
+                        Email: email,
+                        Timestamp: new Date().toISOString(),
+                        Completed: false,
+                        Score: 0
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to submit to database');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('NocoDB submission error:', error);
+                throw error;
+            }
+        }
+
+        // Handle email submission
+        async function handleEmailSubmit() {
+            if (!state.email || !state.name) {
+                state.error = 'Please enter both name and email';
+                render();
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(state.email)) {
+                state.error = 'Please enter a valid email address';
+                render();
+                return;
+            }
+
+            try {
+                // Submit to NocoDB
+                await submitToNocoDB(state.name, state.email);
+                console.log('Lead successfully captured:', { name: state.name, email: state.email });
+
+                state.hasStarted = true;
+                state.error = '';
+                saveState();
+                render();
+            } catch (err) {
+                console.error('Error submitting lead:', err);
+                state.error = 'Error saving your information. Please try again.';
+                render();
+            }
+        }
+
+        // Handle flag submission
+        function handleFlagSubmit() {
+            const challenge = challenges[state.currentChallenge];
+            const normalizedInput = state.flagInput.toLowerCase().trim();
+
+            const isCorrect = challenge.flags.some(flag => flag.toLowerCase() === normalizedInput);
+
+            if (isCorrect) {
+                state.completedChallenges.push(challenge.id);
+                state.success = `Correct! You earned ${challenge.points} points!`;
+                state.error = '';
+                state.flagInput = '';
+
+                if (state.currentChallenge < challenges.length - 1) {
+                    setTimeout(() => {
+                        state.currentChallenge++;
+                        state.success = '';
+                        saveState();
+                        render();
+                    }, 2000);
+                }
+                saveState();
+                render();
+            } else {
+                state.error = 'Incorrect flag. Try again!';
+                state.success = '';
+                render();
+            }
+        }
+
+        // Calculate total points
+        function getTotalPoints() {
+            return state.completedChallenges.reduce((sum, id) => {
+                const challenge = challenges.find(c => c.id === id);
+                return sum + (challenge?.points || 0);
+            }, 0);
+        }
+
+        // Render function
+        function render() {
+            const app = document.getElementById('app');
+
+            if (!state.hasStarted) {
+                app.innerHTML = `
+                    <div class="min-h-screen p-4">
+                        <div class="max-w-2xl mx-auto py-12">
+                            <div class="text-center mb-8">
+                                <h1 class="text-5xl font-bold mb-4 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                                    🦖 NobleReach OSINT Challenge
+                                </h1>
+                                <p class="text-xl text-gray-300">The Scholar's Trail</p>
+                            </div>
+
+                            <div class="bg-slate-800 rounded-lg p-8 shadow-2xl mb-8 border border-slate-700">
+                                <h2 class="text-2xl font-bold mb-4 text-green-400">The Mission</h2>
+                                <p class="text-gray-300 mb-4 leading-relaxed">
+                                    Before the Jurassic Preserve opened its gates, a NobleReach Scholar began a secret 
+                                    project to make an impact for the public good. He vanished into hiding before 
+                                    completing it, but left a trail for others to follow.
+                                </p>
+                                <p class="text-gray-300 leading-relaxed">
+                                    Your mission: Follow the digital breadcrumbs, decode hidden messages, and uncover 
+                                    what the Scholar left behind.
+                                </p>
+                            </div>
+
+                            <div class="bg-slate-800 rounded-lg p-8 shadow-2xl border border-slate-700">
+                                <h3 class="text-xl font-bold mb-6 text-center">Begin Your Journey</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2 text-gray-300">
+                                            <span class="inline-block w-4 h-4 mr-2 align-middle">${icons.user}</span>
+                                            Full Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="name-input"
+                                            value="${state.name}"
+                                            class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white"
+                                            placeholder="John Doe"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2 text-gray-300">
+                                            <span class="inline-block w-4 h-4 mr-2 align-middle">${icons.mail}</span>
+                                            Email Address
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="email-input"
+                                            value="${state.email}"
+                                            class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white"
+                                            placeholder="scholar@example.com"
+                                        />
+                                    </div>
+
+                                    ${state.error ? `
+                                        <div class="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg flex items-center">
+                                            <span class="inline-block w-5 h-5 mr-2">${icons.alert}</span>
+                                            ${state.error}
+                                        </div>
+                                    ` : ''}
+
+                                    <button
+                                        onclick="handleEmailSubmit()"
+                                        class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 shadow-lg"
+                                    >
+                                        Start the Challenge
+                                    </button>
+                                </div>
+                            </div>
+
+                            <p class="text-center text-gray-400 text-sm mt-6">
+                                By continuing, you agree to receive updates about the Scholar's mission
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('name-input').addEventListener('input', (e) => {
+                    state.name = e.target.value;
+                });
+
+                document.getElementById('email-input').addEventListener('input', (e) => {
+                    state.email = e.target.value;
+                });
+
+                return;
+            }
+
+            // Main challenge view
+            const totalPoints = getTotalPoints();
+            const isCompleted = state.completedChallenges.length === challenges.length;
+
+            app.innerHTML = `
+                <div class="min-h-screen p-4">
+                    <div class="max-w-4xl mx-auto py-8">
+                        <div class="text-center mb-8">
+                            <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                                🦖 NobleReach OSINT Challenge
+                            </h1>
+                            <p class="text-gray-400">Operative: ${state.name}</p>
+                        </div>
+
+                        <div class="bg-slate-800 rounded-lg p-6 mb-6 border border-slate-700">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium text-gray-300">Progress</span>
+                                <span class="text-sm font-medium text-green-400">
+                                    <span class="inline-block w-4 h-4 mr-1 align-middle">${icons.trophy}</span>
+                                    ${totalPoints} points
+                                </span>
+                            </div>
+                            <div class="w-full bg-slate-700 rounded-full h-3 mb-4">
+                                <div
+                                    class="bg-gradient-to-r from-green-500 to-blue-500 h-3 rounded-full transition-all duration-500"
+                                    style="width: ${(state.completedChallenges.length / challenges.length) * 100}%"
+                                ></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>${state.completedChallenges.length} of ${challenges.length} challenges completed</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 mb-8">
+                            ${challenges.map((challenge, index) => {
+                                const isUnlocked = index === 0 || state.completedChallenges.includes(challenges[index - 1].id);
+                                const isCompleted = state.completedChallenges.includes(challenge.id);
+                                const isCurrent = index === state.currentChallenge;
+
+                                return `
+                                    <div class="bg-slate-800 rounded-lg p-6 border transition-all ${
+                                        isCurrent && !isCompleted
+                                            ? 'border-green-500 shadow-lg shadow-green-500/20'
+                                            : isCompleted
+                                            ? 'border-green-600'
+                                            : isUnlocked
+                                            ? 'border-slate-700'
+                                            : 'border-slate-800 opacity-50'
+                                    }">
+                                        <div class="flex items-start justify-between mb-4">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-3 mb-2">
+                                                    <span class="inline-block w-6 h-6 ${
+                                                        isCompleted ? 'text-green-500' : isUnlocked ? 'text-blue-400' : 'text-gray-600'
+                                                    }">
+                                                        ${isCompleted ? icons.check : isUnlocked ? icons.unlock : icons.lock}
+                                                    </span>
+                                                    <h3 class="text-xl font-bold">${challenge.title}</h3>
+                                                </div>
+                                                ${isUnlocked ? `
+                                                    <p class="text-gray-300 whitespace-pre-line mb-3">${challenge.description}</p>
+                                                    ${challenge.artifact ? `
+                                                        <div class="bg-slate-700 p-3 rounded border border-slate-600 mb-3">
+                                                            <p class="text-sm text-gray-400 font-mono">${challenge.artifact}</p>
+                                                        </div>
+                                                    ` : ''}
+                                                    <details class="text-sm text-gray-400 mb-3">
+                                                        <summary class="cursor-pointer hover:text-gray-300">💡 Hint</summary>
+                                                        <p class="mt-2 pl-4">${challenge.hint}</p>
+                                                    </details>
+                                                ` : ''}
+                                            </div>
+                                            <div class="text-right ml-4">
+                                                <span class="inline-block bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
+                                                    ${challenge.points} pts
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        ${isCurrent && !isCompleted && isUnlocked ? `
+                                            <div class="mt-4">
+                                                <div class="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        id="flag-input"
+                                                        value="${state.flagInput}"
+                                                        class="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white"
+                                                        placeholder="flag{your_answer_here}"
+                                                    />
+                                                    <button
+                                                        onclick="handleFlagSubmit()"
+                                                        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+                                                    >
+                                                        Submit
+                                                    </button>
+                                                </div>
+                                                ${state.error ? `
+                                                    <p class="text-red-400 text-sm mt-2 flex items-center">
+                                                        <span class="inline-block w-4 h-4 mr-1">${icons.alert}</span>
+                                                        ${state.error}
+                                                    </p>
+                                                ` : ''}
+                                                ${state.success ? `
+                                                    <p class="text-green-400 text-sm mt-2 flex items-center">
+                                                        <span class="inline-block w-4 h-4 mr-1">${icons.check}</span>
+                                                        ${state.success}
+                                                    </p>
+                                                ` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        ${isCompleted ? `
+                            <div class="bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500 rounded-lg p-8 text-center">
+                                <div class="w-16 h-16 mx-auto mb-4 text-yellow-400">${icons.trophy}</div>
+                                <h2 class="text-3xl font-bold mb-4 text-green-400">Mission Complete!</h2>
+                                <p class="text-xl mb-4">Congratulations, ${state.name}!</p>
+                                <p class="text-gray-300 mb-6">
+                                    You've successfully followed the Scholar's trail and uncovered the truth. 
+                                    The Scholar's mission lives on through those brave enough to seek it.
+                                </p>
+                                <div class="bg-slate-800 inline-block px-6 py-3 rounded-lg">
+                                    <p class="text-2xl font-bold text-green-400">Final Score: ${totalPoints} points</p>
+                                </div>
+                                <p class="text-gray-400 mt-6 text-sm">
+                                    Want to learn more? We'll be in touch at ${state.email}
+                                </p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            // Add event listener for flag input if it exists
+            const flagInput = document.getElementById('flag-input');
+            if (flagInput) {
+                flagInput.addEventListener('input', (e) => {
+                    state.flagInput = e.target.value;
+                });
+                flagInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        handleFlagSubmit();
+                    }
+                });
+            }
+        }
+
+        // Initialize
+        loadState();
+        render();
+    </script>
+</body>
+</html>
