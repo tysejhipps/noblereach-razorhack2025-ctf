@@ -30,7 +30,7 @@ This showcase demonstrates how we build engaging, story-driven cybersecurity exp
 - ✅ No backend required - runs entirely client-side
 
 ## Play the Challenge
-🎮 **[Launch Challenge](https://ihypeitup.github.io/noblereach-ctf/)**
+🎮 **[Launch Challenge](https://tysejhipps.github.io/noblereach-razorhack2025-ctf/)**
 
 ## How It Works
 Players progress through 6 interconnected challenges:
